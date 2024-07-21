@@ -1,7 +1,7 @@
 package security_test
 
 import (
-	"NewNASAPI/internal/security"
+	"SecureChat/internal/security"
 	"testing"
 )
 

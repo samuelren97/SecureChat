@@ -2,7 +2,6 @@ package main
 
 import (
 	"SecureChat/internal/models"
-	"SecureChat/internal/security"
 	"bufio"
 	"encoding/json"
 	"log"
@@ -27,16 +26,7 @@ func main() {
 		if err != nil {
 			log.Println("Error, could not accept incoming connection: ", err.Error())
 		}
-
-		privKey, pubKey, err := security.GenerateKeyPair()
-		if err != nil {
-			conn.Close()
-		} else {
-			// TODO: Create user
-			log.Println("DEBUG => privKey: ", privKey)
-			log.Println("DEBUG => pubKey: ", pubKey)
-			go handleConnection(conn)
-		}
+		go handleConnection(conn)
 	}
 }
 
