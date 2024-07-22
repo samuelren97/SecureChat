@@ -10,15 +10,17 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 var (
 	config   *models.ConfigModel = &models.ConfigModel{}
-	sessions *datastructures.LinkList[*models.SessionModel]
+	sessions *datastructures.List[*models.SessionModel]
 )
 
 func main() {
-	sessions = datastructures.NewLinkList[*models.SessionModel]()
+	sessions = datastructures.NewList[*models.SessionModel]()
 	loadConfig()
 
 	listener, err := net.Listen("tcp", config.Server.Port)
@@ -38,12 +40,17 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	menuSequence(conn)
+	user, err := menuSequence(conn)
+	if err != nil {
+		return
+	}
+	go listenForMessages(user)
 }
 
-func menuSequence(conn net.Conn) error {
+func menuSequence(conn net.Conn) (*models.User, error) {
 	isRunning := true
 	var answer *dto.Message
+	var user *models.User
 
 	for isRunning {
 		message := dto.NewMessage(dto.ServerMessage, "1. Open session\n2. Join session\n")
@@ -51,13 +58,13 @@ func menuSequence(conn net.Conn) error {
 		_, err := conn.Write(message.Bytes())
 		if err != nil {
 			log.Println("Error, could not write to connection: ", err.Error())
-			return err
+			return nil, err
 		}
 
 		answer, err = listenForMessage(conn)
 		if err != nil {
 			log.Println("Error, could not listen for message: ", err.Error())
-			return err
+			return nil, err
 		}
 
 		isRunning = answer.Body != "1" && answer.Body != "2"
@@ -68,27 +75,100 @@ func menuSequence(conn net.Conn) error {
 		// Create session
 		var m *dto.Message
 		session := models.NewSession()
-		user := models.NewUser(conn, session.Id)
-		err := session.AddUser(user)
+		user = models.NewUser(conn, session.Id)
 
+		err := session.AddUser(user)
 		if err != nil {
 			conn.Write(dto.NewMessage(dto.ServerMessage, err.Error()).Bytes())
-			return err
+			return nil, err
 		}
-		m = dto.NewMessage(dto.ServerMessage, session.Id.String())
+		m = dto.NewMessage(dto.ServerMessage, "Session id: "+session.Id.String())
 
 		_, err = conn.Write([]byte(m.String()))
 		if err != nil {
 			log.Println("Error, could not write to connection: ", err.Error())
-			return err
+			return nil, err
 		}
 
 		sessions.Add(session)
 
-		go listenForMessages(user)
+		askKeyMessage := dto.NewMessage(dto.AskKeyMessage, "")
+		_, err = conn.Write(askKeyMessage.Bytes())
+		if err != nil {
+			log.Println("Error, could not write to connection: ", err.Error())
+			return nil, err
+		}
+
+		responseMessage, err := listenForMessage(conn)
+		if err != nil {
+			log.Println("Error, could not read message: ", err.Error())
+			return nil, err
+		}
+
+		if responseMessage.Type != dto.KeyExchangeMessage {
+			err = dto.ErrExpectedKeyExhange
+			log.Println("Error, could not process message: ", err.Error())
+			return nil, err
+		}
+
+		user.PubKey = responseMessage.Body
+
+	} else if answer.Body == "2" {
+		message := dto.NewMessage(dto.AskSessionIdMessage, "Enter session Id:")
+		_, err := conn.Write(message.Bytes())
+		if err != nil {
+			log.Println("Error, could not write to connection: ", err.Error())
+			return nil, err
+		}
+
+		responseMessage, err := listenForMessage(conn)
+		if err != nil {
+			log.Println("Error, could not read message: ", err.Error())
+			return nil, err
+		}
+
+		for i := 0; i < sessions.Count; i++ {
+			session := sessions.Get(i)
+			if session.Id == responseMessage.SessionId {
+				id, err := uuid.NewUUID()
+				if err != nil {
+					log.Println("Error, could not create UUID: ", err.Error())
+					return nil, err
+				}
+				user = models.NewUser(conn, id)
+				if err = session.AddUser(user); err != nil {
+					conn.Write([]byte("Can't join the session: " + err.Error()))
+					return nil, err
+				}
+
+				askKeyMessage := dto.NewMessage(dto.AskKeyMessage, "")
+				_, err = conn.Write(askKeyMessage.Bytes())
+				if err != nil {
+					log.Println("Error, could not write to connection: ", err.Error())
+					return nil, err
+				}
+
+				responseMessage, err := listenForMessage(conn)
+				if err != nil {
+					log.Println("Error, could not read message: ", err.Error())
+					return nil, err
+				}
+
+				if responseMessage.Type != dto.KeyExchangeMessage {
+					err = dto.ErrExpectedKeyExhange
+					log.Println("Error, could not process message: ", err.Error())
+					return nil, err
+				}
+
+				user.PubKey = responseMessage.Body
+
+				session.SendKeys()
+				break
+			}
+		}
 	}
 
-	return nil
+	return user, nil
 }
 
 func listenForMessage(conn net.Conn) (*dto.Message, error) {
@@ -99,9 +179,8 @@ func listenForMessage(conn net.Conn) (*dto.Message, error) {
 		return nil, err
 	}
 
-	log.Println("Received: ", message)
-	message = strings.ReplaceAll(message, "\r", "")
 	message = strings.ReplaceAll(message, "\n", "")
+	log.Println("Received: ", message)
 
 	return dto.NewMessageFromString(message)
 }
@@ -114,11 +193,7 @@ func listenForMessages(u *models.User) {
 			break
 		}
 
-		_, err = u.Conn.Write(message.Bytes())
-		if err != nil {
-			log.Println("Error, could not write to connection: ", err.Error())
-			break
-		}
+		log.Println("Received: ", message.Body)
 	}
 
 	isFound := false
@@ -133,9 +208,7 @@ func listenForMessages(u *models.User) {
 
 	if isFound {
 		session := sessions.Get(sessionIndex)
-		session.Users.ForEach(func(u *models.User) {
-			u.Conn.Close()
-		})
+		session.Close()
 		sessions.Remove(sessionIndex)
 	}
 }
