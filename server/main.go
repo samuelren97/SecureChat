@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 )
 
 var (
@@ -37,14 +38,10 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	defer conn.Close()
-
 	menuSequence(conn)
 }
 
 func menuSequence(conn net.Conn) error {
-	defer conn.Close()
-
 	isRunning := true
 	var answer *dto.Message
 
@@ -64,15 +61,23 @@ func menuSequence(conn net.Conn) error {
 		}
 
 		isRunning = answer.Body != "1" && answer.Body != "2"
+		print('e')
 	}
 
 	if answer.Body == "1" {
 		// Create session
+		var m *dto.Message
 		session := models.NewSession()
 		user := models.NewUser(conn, session.Id)
-		session.Users.Add(user)
-		m := dto.NewMessage(dto.ServerMessage, session.Id.String())
-		_, err := conn.Write([]byte(m.String()))
+		err := session.AddUser(user)
+
+		if err != nil {
+			conn.Write(dto.NewMessage(dto.ServerMessage, err.Error()).Bytes())
+			return err
+		}
+		m = dto.NewMessage(dto.ServerMessage, session.Id.String())
+
+		_, err = conn.Write([]byte(m.String()))
 		if err != nil {
 			log.Println("Error, could not write to connection: ", err.Error())
 			return err
@@ -87,7 +92,6 @@ func menuSequence(conn net.Conn) error {
 }
 
 func listenForMessage(conn net.Conn) (*dto.Message, error) {
-	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	message, err := reader.ReadString('\n')
 	if err != nil {
@@ -96,13 +100,13 @@ func listenForMessage(conn net.Conn) (*dto.Message, error) {
 	}
 
 	log.Println("Received: ", message)
+	message = strings.ReplaceAll(message, "\r", "")
+	message = strings.ReplaceAll(message, "\n", "")
 
 	return dto.NewMessageFromString(message)
 }
 
 func listenForMessages(u *models.User) {
-	defer u.Conn.Close()
-
 	for {
 		message, err := listenForMessage(u.Conn)
 		if err != nil {

@@ -2,7 +2,7 @@ package dto
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -12,6 +12,7 @@ type MessageType uint8
 const (
 	Key MessageType = iota
 	ServerMessage
+	ClientMessage
 )
 
 type Message struct {
@@ -20,14 +21,11 @@ type Message struct {
 }
 
 func NewMessageFromString(s string) (*Message, error) {
-	log.Println("DEBUG: message => ", s)
-
 	messageParts := strings.Split(s, "::")
 	if len(messageParts) != 2 {
 		return nil, errors.New("incorrect message format")
 	}
 
-	log.Println("DEBUG: ", messageParts[0])
 	t, err := strconv.Atoi(messageParts[0])
 	if err != nil {
 		return nil, errors.New("incorrect message type")
@@ -35,7 +33,7 @@ func NewMessageFromString(s string) (*Message, error) {
 
 	return &Message{
 		Type: MessageType(t),
-		Body: messageParts[0],
+		Body: messageParts[1],
 	}, nil
 }
 
@@ -47,9 +45,10 @@ func NewMessage(t MessageType, b string) *Message {
 }
 
 func (m *Message) String() string {
-	log.Println("DEBUG: tostring => ", m.Type)
 	// FIXME: Problem here with type
-	return string(m.Type) + "::" + m.Body
+
+	// return string(m.Type) + "::" + m.Body
+	return fmt.Sprintf("%d::%s", m.Type, m.Body)
 }
 
 func (m *Message) Bytes() []byte {

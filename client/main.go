@@ -10,7 +10,10 @@ import (
 	"os"
 )
 
-const DEBUG bool = false
+var (
+	privKey string
+	pubKey  string
+)
 
 func listenServerMessages(conn net.Conn) {
 	defer conn.Close()
@@ -32,7 +35,7 @@ func listenServerMessages(conn net.Conn) {
 		}
 
 		if message.Type == dto.ServerMessage {
-			fmt.Print(message.Body)
+			fmt.Println(message.Body)
 		}
 	}
 }
@@ -48,20 +51,18 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		message, err := reader.ReadString('\n')
+		s, err := reader.ReadString('\n')
 		if err != nil {
 			log.Println("Error reading line: ", err.Error())
 			break
 		}
 
-		n, err := conn.Write([]byte(message))
+		message := dto.NewMessage(dto.ClientMessage, s)
+
+		_, err = conn.Write([]byte(message.String()))
 		if err != nil {
 			log.Println("Error writing: ", err.Error())
 			break
-		}
-		if DEBUG {
-			log.Printf("DEBUG: Message => %s\n", message)
-			log.Printf("DEBUG: Nb of bytes written => %d\n", n)
 		}
 	}
 }
