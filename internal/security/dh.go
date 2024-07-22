@@ -18,8 +18,8 @@ func GenerateKeyPair() (string, string, error) {
 	return hex.EncodeToString(priv.Bytes()), hex.EncodeToString(priv.PublicKey().Bytes()), nil
 }
 
-func ComputeSharedSecret(priv, pub string) (string, error) {
-	pubBytes, err := hex.DecodeString(pub)
+func ComputeSharedSecret(priv, peerPub string) (string, error) {
+	pubBytes, err := hex.DecodeString(peerPub)
 	if err != nil {
 		return "", err
 	}
