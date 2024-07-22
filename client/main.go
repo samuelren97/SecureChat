@@ -46,10 +46,21 @@ func listenServerMessages(conn net.Conn) {
 
 		} else if message.Type == dto.ChatMessage {
 			// TODO: Compute shared secret here
-			fmt.Println("")
+			ss, err := security.ComputeSharedSecret(PrivKey, PeerPubKey)
+			if err != nil {
+				log.Println("Error computing shared secret: ", err.Error())
+				break
+			}
+			decryptedBody, err := security.Decrypt(message.Body, ss[32:])
+			if err != nil {
+				log.Println("Error decrypting message: ", err.Error())
+				break
+			}
+
+			fmt.Println(decryptedBody)
 
 		} else if message.Type == dto.AskSessionIdMessage {
-			fmt.Println(message.Body)
+			fmt.Println("Peer: " + message.Body)
 			IsAskingSessionId = true
 
 		} else if message.Type == dto.AskKeyMessage {
@@ -61,11 +72,7 @@ func listenServerMessages(conn net.Conn) {
 
 		} else if message.Type == dto.UserKeyExchangeMessage {
 			PeerPubKey = message.Body
-			log.Println("DEBUG: PeerPubKey => ", PeerPubKey)
 			IsInChat = true
-
-			ss, _ := security.ComputeSharedSecret(PrivKey, PeerPubKey)
-			log.Println("DEBUG: Shared secret => ", ss)
 		}
 	}
 }
@@ -79,7 +86,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	log.Println("DEBUG: PubKey => ", PubKey)
 
 	conn, err := net.Dial("tcp", "localhost:5000")
 	if err != nil {
@@ -108,7 +114,18 @@ func main() {
 			message = dto.NewJoinSessionMessage(id)
 			IsAskingSessionId = false
 		} else if IsInChat {
-			// TODO: Send chat messages
+			ss, err := security.ComputeSharedSecret(PrivKey, PeerPubKey)
+			if err != nil {
+				log.Println("Error computing shared secret: ", err.Error())
+				break
+			}
+			encryptedBody, err := security.Encrypt(s, ss[32:])
+			if err != nil {
+				log.Println("Error encrypting message: ", err.Error())
+				break
+			}
+
+			message = dto.NewMessage(dto.ChatMessage, encryptedBody)
 		} else {
 			message = dto.NewMessage(dto.ClientMessage, s)
 		}

@@ -31,6 +31,16 @@ func (l *List[T]) Get(index int) T {
 	return l.values[index]
 }
 
+func (l *List[T]) FindIndex(fn func(T) bool) int {
+	for i := 0; i < len(l.values); i++ {
+		if fn(l.values[i]) {
+			return i
+		}
+	}
+
+	return -1
+}
+
 func (l *List[T]) ForEach(f func(T)) {
 	for _, t := range l.values {
 		f(t)
