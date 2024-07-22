@@ -1,6 +1,7 @@
-package main
+package servertools
 
 import (
+	"SecureChat/internal/datastructures"
 	"SecureChat/internal/dto"
 	"SecureChat/internal/models"
 	"log"
@@ -9,7 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
-func HandleOpenSession(conn net.Conn, user *models.User) error {
+func HandleOpenSession(conn net.Conn,
+	user *models.User,
+	sessions *datastructures.List[*models.SessionModel],
+	askForPublicKey func(*models.User) error) error {
 	// Create session
 	var m *dto.Message
 	session := models.NewSession()
@@ -33,7 +37,11 @@ func HandleOpenSession(conn net.Conn, user *models.User) error {
 	return nil
 }
 
-func HandleJoinSession(conn net.Conn, user *models.User) error {
+func HandleJoinSession(conn net.Conn,
+	user *models.User,
+	sessions *datastructures.List[*models.SessionModel],
+	messageListener func(net.Conn) (*dto.Message, error),
+	askForPublicKey func(*models.User) error) error {
 	message := dto.NewMessage(dto.AskSessionIdMessage, "Enter session Id:")
 	_, err := conn.Write(message.Bytes())
 	if err != nil {
@@ -41,7 +49,7 @@ func HandleJoinSession(conn net.Conn, user *models.User) error {
 		return err
 	}
 
-	responseMessage, err := listenForMessage(conn)
+	responseMessage, err := messageListener(conn)
 	if err != nil {
 		log.Println("Error, could not read message: ", err.Error())
 		return err

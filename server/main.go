@@ -4,6 +4,7 @@ import (
 	"SecureChat/internal/datastructures"
 	"SecureChat/internal/dto"
 	"SecureChat/internal/models"
+	"SecureChat/server/servertools"
 	"bufio"
 	"encoding/json"
 	"log"
@@ -48,7 +49,7 @@ func handleConnection(conn net.Conn) {
 func menuSequence(conn net.Conn) (*models.User, error) {
 	isRunning := true
 	var answer *dto.Message
-	var user *models.User
+	var user *models.User = &models.User{}
 
 	for isRunning {
 		message := dto.NewMessage(dto.ServerMessage, "1. Open session\n2. Join session\n")
@@ -70,9 +71,20 @@ func menuSequence(conn net.Conn) (*models.User, error) {
 	}
 
 	if answer.Body == "1" {
-		HandleOpenSession(conn, user)
+		servertools.HandleOpenSession(
+			conn,
+			user,
+			sessions,
+			askForPublicKey,
+		)
 	} else if answer.Body == "2" {
-		HandleJoinSession(conn, user)
+		servertools.HandleJoinSession(
+			conn,
+			user,
+			sessions,
+			listenForMessage,
+			askForPublicKey,
+		)
 	}
 
 	return user, nil
