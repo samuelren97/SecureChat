@@ -5,5 +5,5 @@ type ConfigModel struct {
 }
 
 type ServerConfigModel struct {
-	Port string `json:"port"`
+	Address string `json:"address"`
 }

@@ -22,12 +22,12 @@ func main() {
 	sessions = datastructures.NewList[*models.SessionModel]()
 	loadConfig()
 
-	listener, err := net.Listen("tcp", config.Server.Port)
+	listener, err := net.Listen("tcp", config.Server.Address)
 	if err != nil {
 		log.Fatal("Error, could not start TCP server: ", err.Error())
 	}
 
-	log.Println("Server is listening on port: ", config.Server.Port)
+	log.Println("Server is listening on address: ", config.Server.Address)
 
 	for {
 		conn, err := listener.Accept()
