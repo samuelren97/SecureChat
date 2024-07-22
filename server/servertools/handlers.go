@@ -6,8 +6,6 @@ import (
 	"SecureChat/internal/models"
 	"log"
 	"net"
-
-	"github.com/google/uuid"
 )
 
 func HandleOpenSession(conn net.Conn,
@@ -55,16 +53,12 @@ func HandleJoinSession(conn net.Conn,
 		return err
 	}
 
+	// TODO: Change for find method
 	isFound := false
 	for i := 0; !isFound && i < sessions.Count; i++ {
 		session := sessions.Get(i)
 		if isFound = session.Id == responseMessage.SessionId; isFound {
-			id, err := uuid.NewUUID()
-			if err != nil {
-				log.Println("Error, could not create UUID: ", err.Error())
-				return err
-			}
-			*user = *models.NewUser(conn, id)
+			*user = *models.NewUser(conn, session.Id)
 			if err = session.AddUser(user); err != nil {
 				conn.Write([]byte("Can't join the session: " + err.Error()))
 				return err
@@ -77,8 +71,8 @@ func HandleJoinSession(conn net.Conn,
 	}
 
 	if !isFound {
-		conn.Write([]byte("session id was not found"))
-		// TODO:
+		conn.Write([]byte("Session id was not found"))
+		conn.Close()
 	}
 	return nil
 }

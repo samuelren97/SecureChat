@@ -57,3 +57,15 @@ func (sm *SessionModel) SendKeys() {
 	user1.Conn.Write(user1Message.Bytes())
 	user2.Conn.Write(user2Message.Bytes())
 }
+
+func (sm *SessionModel) SendChatMessage(user *User, message *dto.Message) {
+	if message.Type != dto.ChatMessage {
+		panic("Message type must be of ChatMessage")
+	}
+
+	sm.users.ForEach(func(u *User) {
+		if u.Id != user.Id {
+			u.Conn.Write(message.Bytes())
+		}
+	})
+}

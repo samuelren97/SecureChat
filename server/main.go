@@ -137,21 +137,30 @@ func listenForMessages(u *models.User) {
 		}
 
 		log.Println("Received: ", message.Body)
+
+		if message.Type == dto.ChatMessage {
+			sessionIndex := sessions.FindIndex(func(sm *models.SessionModel) bool {
+				return sm.Id == u.SessionId
+			})
+
+			session := sessions.Get(sessionIndex)
+
+			session.SendChatMessage(u, message) // TODO: Maybe handle this...
+		}
 	}
 
-	isFound := false
-	var sessionIndex int = 0
-	sessions.ForEach(func(session *models.SessionModel) {
-		isFound = session.Id.String() == u.SessionId.String()
-
-		if !isFound {
-			sessionIndex++
-		}
+	sessionIndex := sessions.FindIndex(func(sm *models.SessionModel) bool {
+		return sm.Id == u.SessionId
 	})
 
-	if isFound {
-		session := sessions.Get(sessionIndex)
-		session.Close()
+	if sessionIndex != -1 {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Println("Warning, an error occured with the list")
+			}
+		}()
+		// TODO: Send disconnect message
+		sessions.Get(sessionIndex).Close()
 		sessions.Remove(sessionIndex)
 	}
 }
