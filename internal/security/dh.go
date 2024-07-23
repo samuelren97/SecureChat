@@ -3,7 +3,7 @@ package security
 import (
 	"crypto/ecdh"
 	"crypto/rand"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 )
 
@@ -15,11 +15,13 @@ func GenerateKeyPair() (string, string, error) {
 		return "", "", fmt.Errorf("failed to generate private key: %w", err)
 	}
 
-	return hex.EncodeToString(priv.Bytes()), hex.EncodeToString(priv.PublicKey().Bytes()), nil
+	return base64.URLEncoding.EncodeToString(priv.Bytes()),
+		base64.URLEncoding.EncodeToString(priv.PublicKey().Bytes()),
+		nil
 }
 
 func ComputeSharedSecret(priv, peerPub string) (string, error) {
-	pubBytes, err := hex.DecodeString(peerPub)
+	pubBytes, err := base64.URLEncoding.DecodeString(peerPub)
 	if err != nil {
 		return "", err
 	}
@@ -28,7 +30,7 @@ func ComputeSharedSecret(priv, peerPub string) (string, error) {
 		return "", err
 	}
 
-	privBytes, err := hex.DecodeString(priv)
+	privBytes, err := base64.URLEncoding.DecodeString(priv)
 	if err != nil {
 		return "", err
 	}
@@ -43,5 +45,5 @@ func ComputeSharedSecret(priv, peerPub string) (string, error) {
 		return "", err
 	}
 
-	return hex.EncodeToString(sharedSecret), nil
+	return base64.URLEncoding.EncodeToString(sharedSecret), nil
 }
