@@ -4,6 +4,7 @@ import (
 	"SecureChat/internal/dto"
 	"SecureChat/internal/security"
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -78,6 +79,14 @@ func listenServerMessages(conn net.Conn) {
 }
 
 func main() {
+	var server string
+	var port string
+
+	flag.StringVar(&server, "s", "127.0.0.1", "Specify server.")
+	flag.StringVar(&port, "p", "5000", "Specify port.")
+
+	flag.Parse()
+
 	IsAskingSessionId = false
 	IsInChat = false
 
@@ -87,7 +96,7 @@ func main() {
 		panic(err)
 	}
 
-	conn, err := net.Dial("tcp", "localhost:5000")
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", server, port))
 	if err != nil {
 		panic(err)
 	}
