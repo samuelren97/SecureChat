@@ -51,7 +51,7 @@ func listenServerMessages(conn net.Conn) {
 				log.Println("Error computing shared secret: ", err.Error())
 				break
 			}
-			decryptedBody, err := security.DecryptAESGCM(message.Body, ss[:32])
+			decryptedBody, err := security.DecryptAESGCM(message.Body, ss)
 			if err != nil {
 				log.Println("Error decrypting message: ", err.Error())
 				break
@@ -119,7 +119,7 @@ func main() {
 				log.Println("Error computing shared secret: ", err.Error())
 				break
 			}
-			encryptedBody, err := security.EncryptAESGCM(s, ss[32:])
+			encryptedBody, err := security.EncryptAESGCM(s, ss)
 			if err != nil {
 				log.Println("Error encrypting message: ", err.Error())
 				break

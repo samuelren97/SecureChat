@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"io"
 )
@@ -14,12 +13,13 @@ var (
 	ErrIncorrectKeyLength error = errors.New("incorrect key length")
 )
 
-func EncryptAESGCM(plainText, key string) (string, error) {
+func EncryptAESGCM(plainText, key string) (string, error) { //AES-256 GCM Encryption
 	plainTextBytes := []byte(plainText)
 	keyBytes := []byte(key)
-	if len(keyBytes) != 32 {
+	if len(keyBytes) < 32 {
 		return "", ErrIncorrectKeyLength
 	}
+	keyBytes = keyBytes[:32]
 
 	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
@@ -48,9 +48,10 @@ func DecryptAESGCM(cipherText, key string) (string, error) {
 	}
 
 	keyBytes := []byte(key)
-	if len(key) != 32 {
+	if len(key) < 32 {
 		return "", ErrIncorrectKeyLength
 	}
+	keyBytes = keyBytes[:32]
 
 	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
@@ -73,9 +74,9 @@ func DecryptAESGCM(cipherText, key string) (string, error) {
 	return string(plainTextBytes), nil
 }
 
-func GenerateKey(length int) string {
+func GenerateSecureKey(length int) string {
 	byteSlice := make([]byte, length)
 	rand.Read(byteSlice)
 
-	return hex.EncodeToString(byteSlice)
+	return base64.URLEncoding.EncodeToString(byteSlice)[:length]
 }
