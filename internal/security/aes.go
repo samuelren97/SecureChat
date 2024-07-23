@@ -1,84 +1,81 @@
 package security
 
 import (
-	"bytes"
 	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"io"
 )
 
 var (
 	ErrIncorrectKeyLength error = errors.New("incorrect key length")
 )
 
-func pkcs7Pad(data []byte, blockSize int) []byte {
-	padding := blockSize - len(data)%blockSize
-	padText := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(data, padText...)
+func EncryptAESGCM(plainText, key string) (string, error) {
+	plainTextBytes := []byte(plainText)
+	keyBytes := []byte(key)
+	if len(keyBytes) != 32 {
+		return "", ErrIncorrectKeyLength
+	}
+
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	cipherText := gcm.Seal(nonce, nonce, plainTextBytes, nil)
+
+	return base64.URLEncoding.EncodeToString(cipherText), nil
 }
 
-func Encrypt(message string, key string) (string, error) {
+func DecryptAESGCM(cipherText, key string) (string, error) {
+	cipherTextBytes, err := base64.URLEncoding.DecodeString(cipherText)
+	if err != nil {
+		return "", err
+	}
+
+	keyBytes := []byte(key)
 	if len(key) != 32 {
 		return "", ErrIncorrectKeyLength
 	}
 
-	c, err := aes.NewCipher([]byte(key))
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return "", nil
+	}
+
+	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return "", err
 	}
 
-	// Pad the message to be a multiple of the block size
-	paddedMessage := pkcs7Pad([]byte(message), aes.BlockSize)
+	nonceSize := gcm.NonceSize()
+	nonce, cipherTextBytes := cipherTextBytes[:nonceSize], cipherTextBytes[nonceSize:]
 
-	out := make([]byte, len(paddedMessage))
-	c.Encrypt(out, paddedMessage)
+	plainTextBytes, err := gcm.Open(nil, nonce, cipherTextBytes, nil)
+	if err != nil {
+		return "", err
+	}
 
-	return hex.EncodeToString(out), nil
+	return string(plainTextBytes), nil
 }
 
-func pkcs7Unpad(data []byte) ([]byte, error) {
-	length := len(data)
-	if length == 0 {
-		return nil, errors.New("decryption error: padding size is zero")
-	}
+func GenerateKey(length int) string {
+	byteSlice := make([]byte, length)
+	rand.Read(byteSlice)
 
-	padding := int(data[length-1])
-	if padding > length || padding > aes.BlockSize {
-		return nil, errors.New("decryption error: invalid padding size")
-	}
-
-	for i := 0; i < padding; i++ {
-		if data[length-1-i] != byte(padding) {
-			return nil, errors.New("decryption error: invalid padding")
-		}
-	}
-
-	return data[:length-padding], nil
-}
-
-func Decrypt(message string, key string) (string, error) {
-	if len(key) != 32 {
-		return "", ErrIncorrectKeyLength
-	}
-
-	cipherText, err := hex.DecodeString(message)
-	if err != nil {
-		return "", err
-	}
-
-	c, err := aes.NewCipher([]byte(key))
-	if err != nil {
-		return "", err
-	}
-
-	pt := make([]byte, len(cipherText))
-	c.Decrypt(pt, cipherText)
-
-	// Unpad the decrypted message
-	unpaddedMessage, err := pkcs7Unpad(pt)
-	if err != nil {
-		return "", err
-	}
-
-	return string(unpaddedMessage), nil
+	return hex.EncodeToString(byteSlice)
 }
